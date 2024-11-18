@@ -2456,7 +2456,7 @@ function zeroBSCRM_AJAX_listViewRetrieveData() {
 						'page'             => $page_number,
 						'perPage'          => $per_page,
 
-						'ignoreowner'      => zeroBSCRM_DAL2_ignoreOwnership( ZBS_TYPE_CONTACT ),
+						'ignoreowner'      => zeroBSCRM_DAL2_ignoreOwnership( ZBS_TYPE_CONTACT ) && zeroBSCRM_DAL2_CutomerNotIgnore($listViewParams['listtype'] ),
 
 					);
 
@@ -2479,9 +2479,9 @@ function zeroBSCRM_AJAX_listViewRetrieveData() {
 							// just count
 							'count'        => true,
 
-							'ignoreowner'  => zeroBSCRM_DAL2_ignoreOwnership( ZBS_TYPE_CONTACT ),
+                                        'ignoreowner'      => zeroBSCRM_DAL2_ignoreOwnership( ZBS_TYPE_CONTACT ) && zeroBSCRM_DAL2_CutomerNotIgnore($listViewParams['listtype'] ),
 
-						);
+                                    );
 
 						$res['objectcount'] = (int) $zbs->DAL->contacts->getContacts( $args );
 
@@ -2499,9 +2499,10 @@ function zeroBSCRM_AJAX_listViewRetrieveData() {
 							'quickFilters'  => $possibleQuickFilters,
 							'isTagged'      => $possibleTagIDs,
 							'ownedBy'       => false,
-							'ignoreowner'   => zeroBSCRM_DAL2_ignoreOwnership( ZBS_TYPE_CONTACT ),
+                                            'ignoreowner'      => zeroBSCRM_DAL2_ignoreOwnership( ZBS_TYPE_CONTACT ) && zeroBSCRM_DAL2_CutomerNotIgnore($listViewParams['listtype'] ),
 
-							'onlyObjTotals' => true,
+
+                                        'onlyObjTotals' => true,
 
 						);
 
@@ -3133,10 +3134,31 @@ function zeroBSCRM_AJAX_listViewRetrieveData() {
 					// Retrieve data
 					$transactions = zeroBS_getTransactions( true, $per_page, $page_number, $withCustomer, $possibleSearchTerm, $possibleTagIDs, $inArray, $sortField, $sortOrder, $withTags, $possibleQuickFilters, $external_source_uid );
 
+                      if(!zeroBSCRM_DAL2_CutomerNotIgnore('transaction'))
+                      {
+
+                          $uid   = get_current_user_id();
+                          $contacts = zeroBS_getAllContactsForOwner($uid);
+                          $ids = array_column($contacts, 'id');
+
+                          // Filter the objects based on contact IDs
+                          $transactions = array_filter($transactions, function ($object) use ($ids) {
+                              // Check if any contact's id is in the specified contact IDs array
+                              foreach ($object['contact'] as $contact) {
+                                  if (in_array($contact['id'], $ids)) {
+                                      return true; // Keep this object
+                                  }
+                              }
+                              return false; // Exclude this object
+                          });
+
+                      }
 					// If using pagination, also return total count
 				if ( isset( $listViewParams['pagination'] ) && $listViewParams['pagination'] ) {
 
-					$res['objectcount'] = zeroBS_getTransactionsCountIncParams( true, $per_page, $page_number, $withCustomer, $possibleSearchTerm, $possibleTagIDs, $inArray, $sortField, $sortOrder, $withTags, $possibleQuickFilters );
+                          $countData = zeroBS_getTransactionsDataCount( true, $per_page, $page_number, $withCustomer, $possibleSearchTerm, $possibleTagIDs, $inArray, $sortField, $sortOrder, $withTags, $possibleQuickFilters, $external_source_uid );
+                            $res['objectcount'] = count($countData);
+                         //   $res['objectcount'] = zeroBS_getTransactionsCountIncParams( true, $per_page, $page_number, $withCustomer, $possibleSearchTerm, $possibleTagIDs, $inArray, $sortField, $sortOrder, $withTags, $possibleQuickFilters );
 
 				}
 
